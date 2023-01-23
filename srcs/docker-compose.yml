@@ -1,0 +1,129 @@
+version: '3.9'
+
+volumes:
+  db:
+    name: mariadb
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /home/blind-eagle/data/mariadb
+  wp:
+    name: wordpress
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /home/blind-eagle/data/wordpress
+  website:
+    name: portfolio
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /home/blind-eagle/data/website
+
+networks:
+  inception:
+    driver: bridge
+
+services:
+  mariadb:
+    container_name: mariadb
+    build: ./requirements/mariadb
+    restart: always
+    env_file: .env
+    volumes:
+      - db:/var/lib/mysql
+    networks:
+      - inception
+
+  wordpress:
+    container_name: wordpress
+    build: ./requirements/wordpress
+    env_file: .env
+    volumes:
+      - wp:/var/www/html/wordpress
+    networks:
+      - inception
+    depends_on:
+      - mariadb
+
+  nginx:
+    container_name: nginx
+    build: ./requirements/nginx
+    hostname: localhost
+    volumes:
+      - wp:/var/www/html/wordpress
+    networks:
+      - inception
+    depends_on:
+      - wordpress
+    ports:
+      - "443:443" 
+
+  #Bonus part 
+
+
+  site:
+    container_name: website
+    build: ./requirements/bonus/website
+    hostname: localhost
+    volumes:
+      - website:/var/www/html/
+    ports:
+      - "444:444" 
+    
+  adminer:
+    container_name: adminer
+    build: ./requirements/bonus/adminer/
+    image: adminer:42
+    depends_on:
+      - mariadb
+    ports:
+      - "8080:80"
+    networks:
+      - inception
+    restart: always
+    
+  redis:
+    build: requirements/bonus/redis
+    image: redis
+    container_name: redis
+    ports:
+      - "6379:6379"
+    networks:
+      - inception
+    restart: always
+
+  ftp-server:
+    build: requirements/bonus/ftp_server
+    container_name: ftp-server
+    ports:
+      - "21:21"
+      - "21100-21110:21100-21110"
+    volumes:
+      - wp:/var/www/html/wordpress
+    networks:
+      - inception
+    restart: always
+    environment:
+      FTP_USR: ${FTP_USR}
+      FTP_PWD: ${FTP_PWD}
+
+
+  cadvisor:
+    build: requirements/bonus/cadvisor
+    image: cadvisor
+    container_name: cadvisor
+    restart: always
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+    networks:
+        - inception
+    ports:
+      - "7000:7000"
